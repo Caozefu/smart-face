@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="../face-api.js/dist/face-api.min.js"></script>
+    <style>
+        #image {
+            width: 500px;
+            height: 300px;
+            position: absolute;
+            left: 100px;
+            top: 100px;
+        }
+
+        #canvas,
+        #video {
+            position: absolute;
+            left: 100px;
+            top: 100px;
+        }
+    </style>
+</head>
+
+<body>
+    <button id="btn">start</button>
+    <video src="" id="video" width="500" height="300"></video>
+    <img id="image" src="./xxx.jpg" alt="" >
+    <canvas id="canvas" width="500" height="300"></canvas>
+    <script>
+        const video = document.getElementById('video');
+        const image = document.getElementById('image');
+        const canvas = document.getElementById('canvas');
+        const btn = document.getElementById('btn');
+        const cxt = canvas.getContext('2d');
+        const img = new Image()
+        img.src = './moj.png';
+        console.log(img);
+        // img.onload = drawImage
+        // function drawImage(point) {
+        //     return () => {
+        //         cxt.drawImage(this, 100, 100)
+        //     }
+        // }
+
+        //访问用户媒体设备的兼容方法
+        function getUserMedia(constrains, success, error) {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                //最新标准API
+                navigator.mediaDevices.getUserMedia(constrains).then(success).catch(error);
+            } else if (navigator.webkitGetUserMedia) {
+                //webkit内核浏览器
+                navigator.webkitGetUserMedia(constrains).then(success).catch(error);
+            } else if (navigator.mozGetUserMedia) {
+                //Firefox浏览器
+                navagator.mozGetUserMedia(constrains).then(success).catch(error);
+            } else if (navigator.getUserMedia) {
+                //旧版API
+                navigator.getUserMedia(constrains).then(success).catch(error);
+            }
+        }
+
+        //成功的回调函数
+        function success(stream) {
+            //兼容webkit内核浏览器
+            // var CompatibleURL = window.URL || window.webkitURL;
+            //将视频流设置为video元素的源
+            video.srcObject = stream; // 此处的代码将会报错  解决的办法是将video的srcObject属性指向stream即可
+            //播放视频
+            video.play();
+        }
+
+        //异常的回调函数
+        function error(error) {
+            console.log("访问用户媒体设备失败：", error.name, error.message);
+        }
+
+        function getMedia() {
+            getUserMedia({
+                video: {
+                    width: 500,
+                    height: 300,
+                    facingMode: 'user'
+                }
+            }, success, error);
+        }
+
+
+        async function loadModel() {
+            await faceapi.nets.ssdMobilenetv1.load('./weights');
+            // await faceapi.nets.tinyFaceDetector.load('./weights/tiny');
+            // await faceapi.nets.mtcnn.load('./weights/mtcnn');
+            await faceapi.loadFaceLandmarkModel('./weights/face_landmark');
+            // await faceapi.loadFaceLandmarkTinyModel('./weights/face_landmark');
+            // await faceapi.loadMtcnnModel('./weights/mtcnn');
+        }
+        async function getFace() {
+            if (video.paused || video.ended) return setTimeout(() => getFace())
+            const input = image;
+            // console.log(image);
+            const detections = await faceapi.detectAllFaces(input, new faceapi.SsdMobilenetv1Options())
+                .withFaceLandmarks();
+
+            console.log(detections);
+
+            if (detections && detections.length && detections[0].landmarks && detections[0].landmarks.positions &&
+                detections[0].landmarks.positions.length) {
+                faceapi.matchDimensions(canvas, input)
+                // faceapi.draw.drawDetections(canvas, faceapi.resizeResults(detections, input))
+                // faceapi.draw.drawFaceLandmarks(canvas, faceapi.resizeResults(detections, input))
+                // console.log(detections[0].landmarks.positions);
+
+                detections[0].landmarks.positions.forEach((item, index) => {
+                    drawPoint(item, index);
+                })
+                // const point1 = detections[0].landmarks.positions[17];
+                // const point2 = detections[0].landmarks.positions[26];
+                // const width = Math.sqrt((point2.x - point1.x) ** 2 + (point2.y - point1.y) ** 2) + 30;
+
+                // drawPoint(detections[0].landmarks.positions[17], 17, width);
+                // drawPoint(detections[0].landmarks.positions[26], 26);
+                
+            }
+            setTimeout(() => getFace())
+        }
+        loadModel();
+        // getFace();
+
+        function drawPoint(point, index, width) {
+            console.log(point.x, point.y);
+            // 绘制点
+            // cxt.beginPath();
+            // cxt.arc(point.x, point.y, 5, 0, Math.PI * 2, true);
+            // cxt.closePath();
+            // cxt.fill();
+
+            // 绘制文字
+            cxt.fillStyle = "#FF0000";
+            cxt.font = "10px bold 黑体";
+            // 设置水平对齐方式
+            cxt.textAlign = "center";
+            // 设置垂直对齐方式
+            cxt.textBaseline = "middle";
+            // 绘制文字（参数：要写的字，x坐标，y坐标）
+            cxt.fillText(index, point.x, point.y);
+
+            // 绘制图片
+            // cxt.drawImage(img, point.x - 5, point.y - 5, width, width);
+        }
+
+        btn.onclick = function () {
+            getMedia();
+        }
+        video.onplay = function () {
+            video.onloadedmetadata = function () {
+                getFace();
+            }
+        }
+    </script>
+</body>
+
+</html>
